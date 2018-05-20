@@ -1,6 +1,15 @@
-
-
 from PIL import Image
 from pathlib import Path
-#Test comment
+import numpy
 
+
+
+files = Path('Raw').glob('*.tif')
+
+
+
+for f in files:
+  im = Image.open(f)
+  im.show()
+  
+  
