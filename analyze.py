@@ -4,14 +4,14 @@ import numpy
 
 
 
-files = Path('././Raw').glob('*.tif')
+files = Path('../Raw').glob('*.tif')
 
 
 
 for f in files:
   im = Image.open(f)
-  im.show()
+  #im.show()
   imarray = numpy.array(im)
-  print(imarray.shape())
+  print(imarray)
   
   
