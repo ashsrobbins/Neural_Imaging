@@ -1,0 +1,1 @@
+ffmpeg -framerate 30 -i FFT_%1d.png -s 720x480 -c:v libx264 -r 30 -pix_fmt yuv420p out3.mp4
