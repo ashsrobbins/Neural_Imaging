@@ -185,12 +185,13 @@ class Cell_Analysis(object):
     pix = im.load()
     self.fft_freq = fft_value
     
-    mag = self.fft_data[:,:,fft_value]
+    mag = np.absolute(self.fft_data[:,:,fft_value])
+    norm_mag = mag/np.amax(mag)
     
     for i in range(self.shape[0]):
       for j in range(self.shape[1]):
-        pix[j,i] = (int(np.absolute(self.fft_data[i,j,fft_value]))*pix[j,i][0],pix[j,i][1],pix[j,i][2])
-      
+        # pix[j,i] = (norm_mag[i,j]*pix[j,i][0],pix[j,i][1],pix[j,i][2])
+        pix[j,i] = (int(norm_mag[i,j]*255),pix[j,i][1],pix[j,i][2])
       
     # im.show()
     self.cell_im = im
@@ -221,7 +222,7 @@ class Cell_Analysis(object):
   #Creates self.cluster_data
   def cluster_spacial(self, distance):
     self.cluster_data = np.zeros((1,2),dtype='int')
-    centroid_dict = dict()
+    self.centroid_dict = dict()
     diff_clusters = None
     pix = self.cell_im.load()
     
@@ -242,7 +243,7 @@ class Cell_Analysis(object):
     #Plot data
     plt.scatter(*np.transpose(self.cluster_data), c=self.clusters)
     diff_clusters = set(self.clusters)
-    centroid_dict = dict.fromkeys(diff_clusters,(0,0))
+    self.centroid_dict = dict.fromkeys(diff_clusters,(0,0))
     
     #Iterate through groups, average indices
     for group in diff_clusters:
@@ -250,12 +251,12 @@ class Cell_Analysis(object):
       
       for num,(i,j) in enumerate(self.cluster_data):
         if self.clusters[num] == group:
-          centroid_dict[group] = (centroid_dict[group][0] + i, centroid_dict[group][1] + j)
+          self.centroid_dict[group] = (self.centroid_dict[group][0] + i, self.centroid_dict[group][1] + j)
           count += 1
       
       #Average and annotate plot
-      centroid_dict[group] = tuple(cur/count for cur in centroid_dict[group])
-      plt.annotate(str(group),xy=centroid_dict[group])
+      self.centroid_dict[group] = tuple(cur/count for cur in self.centroid_dict[group])
+      plt.annotate(str(group),xy=self.centroid_dict[group])
   
   
   
@@ -343,7 +344,7 @@ class Cell_Analysis(object):
     
     #Iterate through each cluster, averaging whole cluster over time
     chosen_clusters = (cl for cl in set(self.clusters))
-    for group in chosen_clusters:
+    for q,group in enumerate(chosen_clusters):
       #Add list for each cluster group
       self.avg_cluster_dict[group] = []
       for t in range(self.max_steps):
@@ -358,8 +359,12 @@ class Cell_Analysis(object):
             
             count += 1
         
+        
         #Append avg
         self.avg_cluster_dict[group].append(group_avg/count)
+        
+      if q % 5 == 0:
+        print('Step', q)
         
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #Does cluster analysis on the average cluster dict
@@ -394,22 +399,18 @@ class Cell_Analysis(object):
     print('Clustered Clusters:\n',self.clusters2)
      
     #Plot data
-    plt.scatter(*np.transpose(self.cluster_data), c=self.clusters2)
+    # plt.scatter(*np.transpose(self.cluster_data), c=self.clusters)
+    plt.scatter(*np.transpose(list(self.centroid_dict.values())), c=self.clusters2)
     diff_clusters = set(self.clusters)
-    centroid_dict = dict.fromkeys(diff_clusters,(0,0))
+    # centroid_dict = dict.fromkeys(diff_clusters,(0,0))
     
     #Iterate through groups, average indices
-    for group in diff_clusters:
-      count = 0
+    for num,group in enumerate(diff_clusters):
       
-      for num,(i,j) in enumerate(self.cluster_data):
-        if self.clusters[num] == group:
-          centroid_dict[group] = (centroid_dict[group][0] + i, centroid_dict[group][1] + j)
-          count += 1
       
-      #Average and annotate plot
-      centroid_dict[group] = tuple(cur/count for cur in centroid_dict[group])
-      plt.annotate(str(group),xy=centroid_dict[group])
+      #Plot new cluster number with old centroid
+      tag = str(group) +'(' +  str(self.clusters2[num]) + ')'
+      plt.annotate(tag,xy=self.centroid_dict[group])
   
   
   
@@ -417,7 +418,7 @@ class Cell_Analysis(object):
   
     #plt.annotate(clusters,
     plt.axis("equal")
-    title = "threshold: %f, number of clusters: %d" % (distance, len(set(self.clusters)))
+    title = "threshold: %f, number of clusters: %d" % (distance, len(set(self.clusters2)))
     plt.title(title)
     # plt.imshow(neural_map)
     plt.imshow(np.average(self.time_data,2))
@@ -425,7 +426,47 @@ class Cell_Analysis(object):
      
      
      
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #Cluster the FFT data of the clusters to determine clusters firing together
+  #Needs fft_cluster_analysis to be called first
+  def cluster_fft_grad(self,distance):
+  
+    #make list of magnitudes(instead of freqs)
+    to_cluster = np.gradient(np.absolute(list(self.avg_cluster_fft_dict.values())))
+    
+    #Cluster  
+    self.clusters2 = hcluster.fclusterdata(to_cluster, distance, criterion='distance')
+    
+    print('Clustered Clusters:\n',self.clusters2)
      
+    #Plot data
+    # plt.scatter(*np.transpose(self.cluster_data), c=self.clusters)
+    plt.scatter(*np.transpose(list(self.centroid_dict.values())), c=self.clusters2)
+    diff_clusters = set(self.clusters)
+    # centroid_dict = dict.fromkeys(diff_clusters,(0,0))
+    
+    #Iterate through groups, average indices
+    for num,group in enumerate(diff_clusters):
+      
+      
+      #Plot new cluster number with old centroid
+      tag = str(group) +'(' +  str(self.clusters2[num]) + ')'
+      plt.annotate(tag,xy=self.centroid_dict[group])
+  
+  
+  
+  
+  
+    #plt.annotate(clusters,
+    plt.axis("equal")
+    title = "threshold: %f, number of clusters: %d" % (distance, len(set(self.clusters2)))
+    plt.title(title)
+    # plt.imshow(neural_map)
+    plt.imshow(np.average(self.time_data,2))
+    plt.show() 
+     
+     
+        
     
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  
   #Averages FFT throughout all time, plotting value
@@ -551,9 +592,9 @@ class Cell_Analysis(object):
       if i == 0:
         continue
       mags = np.absolute(self.fft_data[:,:,i])
-      vals_above = (mags > amp_thresh).sum()
+      vals_above = (mags < amp_thresh).sum()
       #Counts below the threshold are wiped
-      if vals_above > count_thresh:
+      if vals_above < count_thresh:
         # print('Vals Above:', vals_above,'\ti:',i)
         self.fft_data[:,:,i].fill(0)
       if i%500 == 0:
@@ -573,6 +614,13 @@ class Cell_Analysis(object):
     
     plt.show()
         
+        
+        
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+  #Saves a dictionary to a file.
+  
+  
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
   #Animates a graph of time data at 120fps, meant to be used for clustered data
@@ -635,9 +683,21 @@ class Cell_Analysis(object):
     
     
   
+  #Saves loaded data to specified filename
+  def save_data(self, filename, data = None):
+    if data == None:
+      data = self.time_data
+    
+    np.savez(filename,data = data)
+    print('Data successfully saved at',filename + '.npz')
 
-
-
+  def load_data(self, filename):
+    npz = np.load(filename + '.npz')
+    self.time_data = npz[npz.files[0]]
+    _,_,self.max_steps = self.time_data.shape
+    print('Data successfully Loaded')
+    
+    
   def graph_to_video(self, im_array,path):
     Writer = animation.writers['ffmpeg']
     writer = Writer(fps=100, metadata=dict(artist='Me'), bitrate=1800)

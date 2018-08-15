@@ -99,6 +99,16 @@ while(1):
     
   c.cluster_spacial(key_in)
   
+  
+
+c.make_avg_cluster_dict()
+
+c.fft_cluster_analysis()
+
+# c.cluster_fft_grad(4000)
+
+c.cluster_fft(4000)
+  
 while(1):
   key_in = input('Input comma-separated Cell list:(-1 to continue)')
   if key_in == '-1':
